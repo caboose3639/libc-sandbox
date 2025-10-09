@@ -13,7 +13,7 @@
 
 namespace cfg {
     struct Node {
-    uint64_t id;
+    uint64_t nodeId;
     std::vector<std::pair<uint64_t, std::string>> edges;
     };
 
@@ -23,19 +23,42 @@ namespace cfg {
         private:
             void clearGraph();
             void createNode();
+            uint64_t scanCallInstructions(llvm::BasicBlock &bb, llvm::Function &func);
+            std::map<llvm::BasicBlock*, uint64_t> bbId;
             std::map<uint64_t, Node> graphNodes;
             uint64_t nodeCounter = 0;
     };
 
     void CFGBuilderPass::clearGraph() {
     graphNodes.clear();
+    bbId.clear();
     nodeCounter = 0;
     }
 
     void CFGBuilderPass::createNode() {
         Node newNode;
-        newNode.id = nodeCounter++;
-        graphNodes[newNode.id] = newNode;
+        newNode.nodeId = nodeCounter++;
+        graphNodes[newNode.nodeId] = newNode;
+    }
+
+    uint64_t CFGBuilderPass::scanCallInstructions(llvm::BasicBlock &bb, llvm::Function &func) {
+        uint64_t currentNodeId = bbId[&bb];
+        for(llvm::Instruction &inst : bb) {
+            if (auto *callInst = llvm::dyn_cast<llvm::CallInst>(&inst)) {
+                if(llvm::Function *calledFunc = callInst->getCalledFunction()) {
+                    std::string funcName = calledFunc->getName().str();
+                    if (funcName == func.getName().str()) {
+                        graphNodes[currentNodeId].edges.push_back({0, funcName});
+                    } else {
+                        uint64_t nextNodeId = nodeCounter;
+                        createNode();
+                        graphNodes[currentNodeId].edges.push_back({nextNodeId, funcName});
+                        currentNodeId = nextNodeId;
+                    }
+                }
+            }
+        }        
+        return currentNodeId;
     }
 
     llvm::PreservedAnalyses CFGBuilderPass::run(llvm::Function &func, llvm::FunctionAnalysisManager &mngr) {
@@ -44,6 +67,36 @@ namespace cfg {
 
         for(llvm::BasicBlock &bb : func) {
             createNode();
+            bbId[&bb] = nodeCounter - 1;
+        }
+
+        llvm::BasicBlock &entryBB = func.getEntryBlock();
+        uint64_t entryNodeId = bbId[&entryBB];
+        graphNodes[0].edges.push_back({entryNodeId, "ε"});
+
+        for(llvm::BasicBlock &bb : func) {
+            uint64_t lastNodeId = scanCallInstructions(bb, func);
+
+            llvm::Instruction *terminator = bb.getTerminator();
+            for (unsigned i = 0; i < terminator->getNumSuccessors(); i++) {
+                llvm::BasicBlock *successor = terminator->getSuccessor(i);
+                uint64_t successorNodeId = bbId[successor];
+                graphNodes[lastNodeId].edges.push_back({successorNodeId, "ε"});
+            }
+        }
+
+        std::vector<uint64_t> lastNodeIds;
+        for(auto const& [id, node] : graphNodes) {
+            if(node.edges.empty() && id != 0) {
+                lastNodeIds.push_back(id);
+            }
+        }
+
+        uint64_t exitNodeId = nodeCounter;
+        createNode();
+
+        for(uint64_t id : lastNodeIds) {
+            graphNodes[id].edges.push_back({exitNodeId, "ε"});
         }
 
         return llvm::PreservedAnalyses::all();
