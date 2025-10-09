@@ -123,3 +123,22 @@ namespace cfg {
         outfile.close();
     }
 }
+
+extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
+llvmGetPassPluginInfo() {
+    return {
+        LLVM_PLUGIN_API_VERSION, "CFGBuilderPass", "v0.1",
+        [](llvm::PassBuilder &PB) {
+            PB.registerPipelineParsingCallback(
+                [](llvm::StringRef Name, llvm::FunctionPassManager &FPM,
+                   llvm::ArrayRef<llvm::PassBuilder::PipelineElement>) {
+                    if (Name == "cfg-builder-pass") {
+                        FPM.addPass(cfg::CFGBuilderPass());
+                        return true;
+                    }
+                    return false;
+                }
+            );
+        }
+    };
+}
