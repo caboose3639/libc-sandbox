@@ -10,6 +10,7 @@
 #include <vector>
 #include <utility>
 #include <map>
+#include <fstream>
 
 namespace cfg {
     struct Node {
@@ -24,15 +25,16 @@ namespace cfg {
             void clearGraph();
             void createNode();
             uint64_t scanCallInstructions(llvm::BasicBlock &bb, llvm::Function &func);
+            void dumpGraph(llvm::Function &func, uint64_t exitNodeId);
             std::map<llvm::BasicBlock*, uint64_t> bbId;
             std::map<uint64_t, Node> graphNodes;
             uint64_t nodeCounter = 0;
     };
 
     void CFGBuilderPass::clearGraph() {
-    graphNodes.clear();
-    bbId.clear();
-    nodeCounter = 0;
+        graphNodes.clear();
+        bbId.clear();
+        nodeCounter = 0;
     }
 
     void CFGBuilderPass::createNode() {
@@ -100,5 +102,24 @@ namespace cfg {
         }
 
         return llvm::PreservedAnalyses::all();
+    }
+
+    void CFGBuilderPass::dumpGraph(llvm::Function &func, uint64_t exitNodeId) {
+        std::string filename = func.getName().str() + "_cfg.dot";
+        std::ofstream outfile(filename);
+        outfile << "digraph " << func.getName().str() << " {\n";
+        outfile << "    rankdir=LR;\n";
+        outfile << "    " << 0 << " [shape=doublecircle, label=\"Start\"];\n";
+        outfile << "    " << exitNodeId << " [shape=doublecircle, label=\"End\"];\n";
+
+        for(auto const& [id, node] : graphNodes) {
+            for (auto const& edge : node.edges) {
+                outfile << "    " << id << " -> " << edge.first;
+                outfile << " [label=\"" << edge.second << "\"];\n";
+            }
+        }
+        
+        outfile << "}\n";
+        outfile.close();
     }
 }
