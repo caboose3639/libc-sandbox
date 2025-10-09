@@ -20,6 +20,7 @@ namespace cfg {
 
     class CFGBuilderPass : public llvm::PassInfoMixin<CFGBuilderPass> {
         public:
+            static bool isRequired() {return true;}
             llvm::PreservedAnalyses run(llvm::Function &func, llvm::FunctionAnalysisManager &mngr);
         private:
             void clearGraph();
@@ -101,6 +102,9 @@ namespace cfg {
             graphNodes[id].edges.push_back({exitNodeId, "ε"});
         }
 
+        uint64_t finalNodeId = nodeCounter - 1;
+        dumpGraph(func, finalNodeId);
+
         return llvm::PreservedAnalyses::all();
     }
 
@@ -109,6 +113,7 @@ namespace cfg {
         std::ofstream outfile(filename);
         outfile << "digraph " << func.getName().str() << " {\n";
         outfile << "    rankdir=LR;\n";
+        outfile << "    node [shape=circle];\n";
         outfile << "    " << 0 << " [shape=doublecircle, label=\"Start\"];\n";
         outfile << "    " << exitNodeId << " [shape=doublecircle, label=\"End\"];\n";
 
