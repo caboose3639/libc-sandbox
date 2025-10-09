@@ -12,22 +12,40 @@
 #include <map>
 
 namespace cfg {
-
     struct Node {
     uint64_t id;
-    std::vector<std::pair<Node*, std::string>> edges;
+    std::vector<std::pair<uint64_t, std::string>> edges;
     };
 
     class CFGBuilderPass : public llvm::PassInfoMixin<CFGBuilderPass> {
         public:
             llvm::PreservedAnalyses run(llvm::Function &func, llvm::FunctionAnalysisManager &mngr);
         private:
+            void clearGraph();
+            void createNode();
             std::map<uint64_t, Node> graphNodes;
             uint64_t nodeCounter = 0;
     };
 
+    void CFGBuilderPass::clearGraph() {
+    graphNodes.clear();
+    nodeCounter = 0;
+    }
+
+    void CFGBuilderPass::createNode() {
+        Node newNode;
+        newNode.id = nodeCounter++;
+        graphNodes[newNode.id] = newNode;
+    }
+
     llvm::PreservedAnalyses CFGBuilderPass::run(llvm::Function &func, llvm::FunctionAnalysisManager &mngr) {
-        graphNodes.clear();
-        nodeCounter = 0;
+        clearGraph();
+        createNode();
+
+        for(llvm::BasicBlock &bb : func) {
+            createNode();
+        }
+
+        return llvm::PreservedAnalyses::all();
     }
 }
