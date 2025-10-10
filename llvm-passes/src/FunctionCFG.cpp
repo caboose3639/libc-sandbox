@@ -13,6 +13,9 @@
 #include <fstream>
 
 #include "../include/libc_callnames.h"
+bool isLibcFunction(const std::string &funcName) {
+    return libc_callnames.find(funcName) != libc_callnames.end();
+}
 
 namespace cfg {
     struct Node {
@@ -53,11 +56,14 @@ namespace cfg {
                 if(llvm::Function *calledFunc = callInst->getCalledFunction()) {
                     std::string funcName = calledFunc->getName().str();
                     if (funcName == func.getName().str()) {
-                        graphNodes[currentNodeId].edges.push_back({0, funcName});
+                        graphNodes[currentNodeId].edges.push_back({0, "ε"});
                     } else {
                         uint64_t nextNodeId = nodeCounter;
                         createNode();
-                        graphNodes[currentNodeId].edges.push_back({nextNodeId, funcName});
+                        if (isLibcFunction(funcName))
+                            graphNodes[currentNodeId].edges.push_back({nextNodeId, funcName});
+                        else    
+                            graphNodes[currentNodeId].edges.push_back({nextNodeId, "ε"});
                         currentNodeId = nextNodeId;
                     }
                 }
@@ -116,8 +122,8 @@ namespace cfg {
         outfile << "digraph " << func.getName().str() << " {\n";
         outfile << "    rankdir=LR;\n";
         outfile << "    node [shape=circle];\n";
-        outfile << "    " << 0 << " [shape=doublecircle, label=\"Start\"];\n";
-        outfile << "    " << exitNodeId << " [shape=doublecircle, label=\"End\"];\n";
+        outfile << "    " << 0 << " [shape=circle, label=\"start\"];\n";
+        outfile << "    " << exitNodeId << " [shape=circle, label=\"end\"];\n";
 
         for(auto const& [id, node] : graphNodes) {
             for (auto const& edge : node.edges) {
