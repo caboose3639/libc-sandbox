@@ -12,6 +12,8 @@
 #include <map>
 #include <fstream>
 
+#include "../include/libc_callnames.h"
+
 namespace cfg {
     struct Node {
     uint64_t nodeId;
