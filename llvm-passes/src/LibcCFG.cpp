@@ -71,21 +71,24 @@ namespace cfg {
                         graphNodes[currentNodeId].edges.push_back({funcEntryNodeId, "ε"});
                     } else if(calledFunc->isDeclaration()) {
                         uint64_t nextNodeId = createNode();
-                        if(isLibcFunction(funcName))
+                        if(isLibcFunction(funcName)){
+                            funcName = funcName + "()";
                             graphNodes[currentNodeId].edges.push_back({nextNodeId, funcName});
+                        }
                         else    
                             graphNodes[currentNodeId].edges.push_back({nextNodeId, "ε"});
                         currentNodeId = nextNodeId;
                     } else {
-                        if(bbId.find({calledFunc, &calledFunc->getEntryBlock()}) == bbId.end()) {
+                        llvm::BasicBlock &calledFuncEntryBB = calledFunc->getEntryBlock();
+                        if(bbId.find({calledFunc, &calledFuncEntryBB}) == bbId.end()) {
                             for(llvm::BasicBlock &calleeBB : *calledFunc) {
                                 bbId[{calledFunc, &calleeBB}] = createNode();
                             }
                         }
-                        uint64_t nextNodeId  = createNode();
-                        llvm::BasicBlock &calledFuncEntryBB = calledFunc->getEntryBlock();
                         uint64_t calledFuncEntryId = bbId.at({calledFunc, &calledFuncEntryBB});
-                        graphNodes[currentNodeId].edges.push_back({calledFuncEntryId, calledFunc->getName().str()});
+                        std::string label = calledFunc->getName().str() + "()";
+                        graphNodes[currentNodeId].edges.push_back({calledFuncEntryId, label});
+                        uint64_t nextNodeId  = createNode();
                         graphNodes[funcExitNodeId.at(calledFunc)].edges.push_back({nextNodeId, "ε"});
                         currentNodeId = nextNodeId;
                     }
@@ -123,7 +126,8 @@ namespace cfg {
                 llvm::Instruction *terminator = bb.getTerminator();
                 if(!terminator) continue;
                 if (llvm::isa<llvm::ReturnInst>(terminator)) {
-                    graphNodes[lastNodeId].edges.push_back({funcExitNodeId.at(&func), "ε"});
+                    std::string label = "return:" + func.getName().str() + "()";
+                    graphNodes[lastNodeId].edges.push_back({funcExitNodeId.at(&func), label});
                 }
                 for(unsigned i = 0; i < terminator->getNumSuccessors(); i++) {
                     llvm::BasicBlock *successor = terminator->getSuccessor(i);
@@ -160,7 +164,7 @@ namespace cfg {
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
     return {
-        LLVM_PLUGIN_API_VERSION, "CFGBuilderPass", "v0.2",
+        LLVM_PLUGIN_API_VERSION, "CFGBuilderPass", "v0.2.1",
         [](llvm::PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
                 [](llvm::StringRef Name, llvm::ModulePassManager &MPM,
