@@ -3,6 +3,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 
@@ -145,7 +146,10 @@ namespace cfg {
     }
 
     void CFGBuilderPass::dumpGraph(llvm::Module &Mod) {
-        std::string filename = "cfg.dot";
+        std::string sourceFile = Mod.getSourceFileName();
+        llvm::StringRef baseNameRef = llvm::sys::path::stem(sourceFile);
+        std::string baseName = baseNameRef.str();
+        std::string filename = baseName + "_cfg.dot";
         std::ofstream outfile(filename);
         outfile << "digraph CFG {\n";
         outfile << "    rankdir=LR;\n";
@@ -164,7 +168,7 @@ namespace cfg {
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
     return {
-        LLVM_PLUGIN_API_VERSION, "CFGBuilderPass", "v0.2.1",
+        LLVM_PLUGIN_API_VERSION, "CFGBuilderPass", "v0.2.2",
         [](llvm::PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
                 [](llvm::StringRef Name, llvm::ModulePassManager &MPM,
