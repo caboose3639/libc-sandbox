@@ -79,11 +79,20 @@ namespace icfg {
                         uint64_t nextNodeId = createNode();
                         graphNodes[currentNodeId].edges.push_back({nextNodeId, label});
                         currentNodeId = nextNodeId;
+                    } else if (funcName == "syscall") {
+                        std::string label;
+                        if (auto* constInt = llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(0))) {
+                            label = "syscall(" + std::to_string(constInt->getZExtValue()) + ")";
+                        }
+                        uint64_t nextNodeId = createNode();
+                        graphNodes[currentNodeId].edges.push_back({nextNodeId, label});
+                        currentNodeId = nextNodeId;
                     } else if (calledFunc->isDeclaration()) {
                         uint64_t nextNodeId = createNode();
                         if(isLibcFunction(funcName)){
-                            funcName = funcName + "()";
-                            graphNodes[currentNodeId].edges.push_back({nextNodeId, funcName});
+                            // funcName = funcName + "()";
+                            // graphNodes[currentNodeId].edges.push_back({nextNodeId, funcName});
+                            continue;
                         }
                         else    
                             graphNodes[currentNodeId].edges.push_back({nextNodeId, "ε"});
@@ -96,8 +105,8 @@ namespace icfg {
                             }
                         }
                         uint64_t calledFuncEntryId = bbId.at({calledFunc, &calledFuncEntryBB});
-                        std::string label = calledFunc->getName().str() + "()";
-                        graphNodes[currentNodeId].edges.push_back({calledFuncEntryId, label});
+                        // std::string label = calledFunc->getName().str() + "()";
+                        graphNodes[currentNodeId].edges.push_back({calledFuncEntryId, "ε"});
                         uint64_t nextNodeId  = createNode();
                         graphNodes[funcExitNodeId.at(calledFunc)].edges.push_back({nextNodeId, "ε"});
                         currentNodeId = nextNodeId;
@@ -136,8 +145,8 @@ namespace icfg {
                 llvm::Instruction *terminator = bb.getTerminator();
                 if(!terminator) continue;
                 if (llvm::isa<llvm::ReturnInst>(terminator)) {
-                    std::string label = "return:" + func.getName().str() + "()";
-                    graphNodes[lastNodeId].edges.push_back({funcExitNodeId.at(&func), label});
+                    // std::string label = "return:" + func.getName().str() + "()";
+                    graphNodes[lastNodeId].edges.push_back({funcExitNodeId.at(&func), "ε"});
                 }
                 for(unsigned i = 0; i < terminator->getNumSuccessors(); i++) {
                     llvm::BasicBlock *successor = terminator->getSuccessor(i);
@@ -174,7 +183,7 @@ namespace icfg {
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
     return {
-        LLVM_PLUGIN_API_VERSION, "InstrumentedCFGBuilderPass", "v0.1",
+        LLVM_PLUGIN_API_VERSION, "InstrumentedCFGBuilderPass", "v0.2",
         [](llvm::PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
                 [](llvm::StringRef Name, llvm::ModulePassManager &MPM,
