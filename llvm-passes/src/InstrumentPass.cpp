@@ -2,21 +2,13 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 
 #include <string>
 
-#include "../include/dummy_syscall.h"
-static int libcMap(const std::string& funcName) {
-    auto it = dummy_syscall_map.find(funcName);
-    if (it != dummy_syscall_map.end()) {
-        return it->second;
-    }
-    return -1;
-}
+#include "DummySyscalls.cpp"
 
 namespace instrument {
     class InstrumentPass : public llvm::PassInfoMixin<InstrumentPass> {
@@ -69,7 +61,7 @@ namespace instrument {
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
     return {
-        LLVM_PLUGIN_API_VERSION, "InstrumentPass", "v0.1",
+        LLVM_PLUGIN_API_VERSION, "InstrumentPass", "v0.2",
         [](llvm::PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
                 [](llvm::StringRef Name, llvm::ModulePassManager &MPM,
