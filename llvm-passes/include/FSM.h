@@ -25,5 +25,7 @@ namespace fsm {
 
     void removeEpsilonTransitions(nfaNode* startNode);
 
+    nfaNode* mergeEquivalentStates(nfaNode* startNode);
+
     void clearGraph(nfaNode* startNode);
 }

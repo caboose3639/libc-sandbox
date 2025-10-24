@@ -25,7 +25,7 @@ namespace icfg {
             std::map<std::pair<llvm::Function*, llvm::BasicBlock*>, fsm::nfaNode*> bbId;
 
             fsm::nfaNode* createNode();
-            void dumpGraph(llvm::Module &Mod);
+            void dumpGraph(llvm::Module &Mod, fsm::nfaNode* startNode);
             fsm::nfaNode* scanCallInstructions(llvm::BasicBlock &bb, llvm::Function &func);
     };
 
@@ -100,9 +100,7 @@ namespace icfg {
         return currentNode;
     }
 
-    void syscallCFGPass::dumpGraph(llvm::Module &Mod) {
-        fsm::removeEpsilonTransitions(startNode);
-
+    void syscallCFGPass::dumpGraph(llvm::Module &Mod,fsm::nfaNode* startNode) {
         std::set<fsm::nfaNode*> visited;
         std::queue<fsm::nfaNode*> q;
         q.push(startNode);
@@ -177,8 +175,14 @@ namespace icfg {
             }
         }
 
-        dumpGraph(Mod);
-        fsm::clearGraph(startNode);
+        fsm::removeEpsilonTransitions(startNode);
+
+        fsm::nfaNode* mergedStartNode = fsm::mergeEquivalentStates(startNode);
+
+        dumpGraph(Mod, mergedStartNode);
+        
+        fsm::clearGraph(mergedStartNode);
+
         return llvm::PreservedAnalyses::all();
     }
 }
@@ -186,7 +190,7 @@ namespace icfg {
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
     return {
-        LLVM_PLUGIN_API_VERSION, "syscallCFGPass", "v0.3",
+        LLVM_PLUGIN_API_VERSION, "syscallCFGPass", "v0.4",
         [](llvm::PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
                 [](llvm::StringRef Name, llvm::ModulePassManager &MPM,

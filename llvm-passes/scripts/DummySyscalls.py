@@ -1,7 +1,7 @@
 import subprocess
 import os
 
-command = "nm -D /usr/lib/x86_64-linux-gnu/libc.so.6 | grep ' T ' | awk '{print $3}' | cut -d@ -f1 | sort -u"
+command = "nm -D /usr/lib/x86_64-linux-gnu/libc.so.6 | grep -E ' (T|W) ' | awk '{print $3}' | cut -d@ -f1 | sort -u"
 
 result = subprocess.run(command, shell = True, capture_output = True, text = True)
 
