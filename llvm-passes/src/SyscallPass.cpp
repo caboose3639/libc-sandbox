@@ -47,36 +47,56 @@ namespace icfg {
         fsm::nfaNode* funcEntryNode = bbId[entryKey];
         for(llvm::Instruction &inst : bb) {
             if(auto *callInst = llvm::dyn_cast<llvm::CallInst>(&inst)) {
+                if (auto *inlineAsm = llvm::dyn_cast<llvm::InlineAsm>(callInst->getCalledOperand())) {
+                    std::string asmStr = inlineAsm->getAsmString();
+                    if (asmStr.find("syscall") != std::string::npos) {
+                        std::string label = "syscall(470)";
+                        if (callInst->getNumOperands() > 0) {
+                            if (auto *constInt = llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(0))) {
+                                label += " : " + std::to_string(constInt->getZExtValue());
+                            }
+                        }
+                        fsm::nfaNode *nextNode = createNode();
+                        currentNode->edges.push_back({nextNode, label});
+                        currentNode = nextNode;
+                        continue;
+                    }
+                }
                 if(llvm::Function *calledFunc = callInst->getCalledFunction()) {
                     std::string funcName = calledFunc->getName().str();
                     if(funcName == func.getName().str()) {
                         currentNode->edges.push_back({funcEntryNode, "ε"});
-                    } else if(funcName == "dummy_syscall") {
-                        llvm::Value *arg  = callInst->getArgOperand(0);
-                        std::string label;
-                        if (auto *constInt = llvm::dyn_cast<llvm::ConstantInt>(arg)) {
-                            uint64_t callArg = constInt->getZExtValue();
-                            label = "dummy_syscall(" + std::to_string(callArg) + ")";
-                        }
-                        fsm::nfaNode* nextNode = createNode();
-                        currentNode->edges.push_back({nextNode, label});
-                        currentNode = nextNode;
                     } else if (funcName == "syscall") {
                         std::string label;
+                        std::string syscallNum = "";
+                        std::string syscallArg = "";
+
                         if (auto* constInt = llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(0))) {
-                            label = "syscall(" + std::to_string(constInt->getZExtValue()) + ")";
+                            syscallNum = std::to_string(constInt->getZExtValue());
                         }
+
+                        if (callInst->getNumOperands() > 1) {
+                            if (auto* constArg = llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(1))) {
+                                syscallArg = std::to_string(constArg->getZExtValue());
+                            }
+                        }
+
+                        label = "syscall(" + syscallNum + ")";
+                        if (!syscallArg.empty()) {
+                            label += " : " + syscallArg;
+                        }
+                        
                         fsm::nfaNode* nextNode = createNode();
                         currentNode->edges.push_back({nextNode, label});
                         currentNode = nextNode;
                     } else if (calledFunc->isDeclaration()) {
                         fsm::nfaNode* nextNode = createNode();
                         if(isLibcFunction(funcName)){
+                            currentNode->edges.push_back({nextNode, "ε"});
                             if (funcName == "call:exit" || funcName == "call:_exit" || 
                                 funcName == "call:quick_exit" || funcName == "call:abort") {
                                 nextNode->isFinalState = true;
                             }
-                            continue;
                         }
                         else
                             currentNode->edges.push_back({nextNode, "ε"});
@@ -89,7 +109,8 @@ namespace icfg {
                             }
                         }
                         fsm::nfaNode* calledFuncEntryNode = bbId.at({calledFunc, &calledFuncEntryBB});
-                        currentNode->edges.push_back({calledFuncEntryNode, "ε"});
+                        std::string label = "call:" + calledFunc->getName().str();
+                        currentNode->edges.push_back({calledFuncEntryNode, label});
                         fsm::nfaNode* nextNode = createNode();
                         funcExitNode.at(calledFunc)->edges.push_back({nextNode, "ε"});
                         currentNode = nextNode;
@@ -162,7 +183,8 @@ namespace icfg {
                 llvm::Instruction *terminator = bb.getTerminator();
                 if(!terminator) continue;
                 if (llvm::isa<llvm::ReturnInst>(terminator)) {
-                    lastNode->edges.push_back({funcExitNode.at(&func), "ε"});
+                    std::string label = "ret:" + func.getName().str();
+                    lastNode->edges.push_back({funcExitNode.at(&func), label});
                 }
                 for(unsigned i = 0; i < terminator->getNumSuccessors(); i++) {
                     llvm::BasicBlock *successor = terminator->getSuccessor(i);
@@ -190,7 +212,7 @@ namespace icfg {
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
     return {
-        LLVM_PLUGIN_API_VERSION, "syscallCFGPass", "v0.4",
+        LLVM_PLUGIN_API_VERSION, "syscallCFGPass", "v0.5",
         [](llvm::PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
                 [](llvm::StringRef Name, llvm::ModulePassManager &MPM,
