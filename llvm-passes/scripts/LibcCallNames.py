@@ -19,6 +19,6 @@ for line in callnames.splitlines():
 header.append("};")
 header.append("")
 
-out_path = "../include/CallNames.h"
+out_path = "llvm-passes/include/CallNames.h"
 with open(out_path, "w") as f:
     f.write("\n".join(header))

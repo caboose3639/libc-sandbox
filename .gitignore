@@ -1,4 +1,3 @@
 venv/
 llvm-passes/build/
 llvm-passes/output
-llvm-passes/test/
