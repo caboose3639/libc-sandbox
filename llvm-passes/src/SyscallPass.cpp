@@ -81,9 +81,8 @@ namespace icfg {
                             }
                         }
 
-                        label = "syscall(" + syscallNum + ")";
                         if (!syscallArg.empty()) {
-                            label += " : " + syscallArg;
+                            label += syscallArg;
                         }
                         
                         fsm::nfaNode* nextNode = createNode();
@@ -92,11 +91,7 @@ namespace icfg {
                     } else if (calledFunc->isDeclaration()) {
                         fsm::nfaNode* nextNode = createNode();
                         if(isLibcFunction(funcName)){
-                            currentNode->edges.push_back({nextNode, "ε"});
-                            if (funcName == "call:exit" || funcName == "call:_exit" || 
-                                funcName == "call:quick_exit" || funcName == "call:abort") {
-                                nextNode->isFinalState = true;
-                            }
+                            continue;
                         }
                         else
                             currentNode->edges.push_back({nextNode, "ε"});
@@ -109,8 +104,7 @@ namespace icfg {
                             }
                         }
                         fsm::nfaNode* calledFuncEntryNode = bbId.at({calledFunc, &calledFuncEntryBB});
-                        std::string label = "call:" + calledFunc->getName().str();
-                        currentNode->edges.push_back({calledFuncEntryNode, label});
+                        currentNode->edges.push_back({calledFuncEntryNode, "ε"});
                         fsm::nfaNode* nextNode = createNode();
                         funcExitNode.at(calledFunc)->edges.push_back({nextNode, "ε"});
                         currentNode = nextNode;
@@ -183,8 +177,7 @@ namespace icfg {
                 llvm::Instruction *terminator = bb.getTerminator();
                 if(!terminator) continue;
                 if (llvm::isa<llvm::ReturnInst>(terminator)) {
-                    std::string label = "ret:" + func.getName().str();
-                    lastNode->edges.push_back({funcExitNode.at(&func), label});
+                    lastNode->edges.push_back({funcExitNode.at(&func), "ε"});
                 }
                 for(unsigned i = 0; i < terminator->getNumSuccessors(); i++) {
                     llvm::BasicBlock *successor = terminator->getSuccessor(i);

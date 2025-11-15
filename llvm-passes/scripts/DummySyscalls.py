@@ -21,7 +21,7 @@ for name in callnames:
 header.append("};")
 header.append("")
 
-out_path = "llvm-passes/include/DummySyscalls.h"
+out_path = "include/DummySyscalls.h"
 
 with open(out_path, "w") as f: 
     f.write("\n".join(header))
